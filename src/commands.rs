@@ -1,43 +1,49 @@
-use teloxide::{
-    requests::{Requester, ResponseResult},
-    types::Message,
-    utils::command::BotCommands,
-    Bot,
-};
+use teloxide::{requests::Requester, types::Message, utils::command::BotCommands};
+use tracing::debug;
 
-#[derive(BotCommands, Clone)]
+use crate::utils::{Bot, Context};
+
+#[derive(BotCommands, Clone, Debug)]
 #[command(
     rename_rule = "lowercase",
-    description = "These commands are supported:"
+    description = "These commands are supported:",
+    parse_with = "split"
 )]
 pub enum Command {
+    #[command(description = "display this text.")]
+    Help,
+    #[command(description = "rolle the dice.")]
     Roll,
+    #[command(description = "manage timers.")]
     Timers,
 }
 
-pub async fn handle_command(
-    bot: Bot,
-    msg: Message,
-    cmd: Command,
-) -> Result<(), teloxide::RequestError> {
-    match cmd {
-        Command::Roll => handle_roll(bot, msg).await,
-        Command::Timers => handle_timers(bot, msg).await,
-    }
+pub fn is_command(msg: &Message, context: &Context) -> Option<Command> {
+    let bot_name = context
+        .me
+        .username
+        .as_ref()
+        .expect("Bots must have a username");
+
+    msg.text()
+        .and_then(|text| Command::parse(text, &bot_name).ok())
 }
 
-async fn handle_roll(bot: Bot, msg: Message) -> ResponseResult<()> {
-    log::info!("Roll called by {:?}", msg.from());
-
-    bot.send_dice(msg.chat.id).await?;
-    Ok(())
-}
-
-async fn handle_timers(bot: Bot, msg: Message) -> ResponseResult<()> {
-    bot.send_message(
-        msg.chat.id,
-        format!("Not implemented yet, please come back later."),
-    )
-    .await?;
+pub async fn handle_command(bot: &Bot, msg: &Message, command: Command) -> anyhow::Result<()> {
+    debug!("Got command {:?}", command);
+    match command {
+        Command::Help => {
+            bot.send_message(msg.chat.id, Command::descriptions().to_string())
+                .await?
+        }
+        Command::Roll => bot.send_dice(msg.chat.id).await?,
+        Command::Timers => {
+            bot.send_message(
+                msg.chat.id,
+                format!("Not implemented yet, please come back later."),
+            )
+            .await?
+        }
+    };
     Ok(())
 }

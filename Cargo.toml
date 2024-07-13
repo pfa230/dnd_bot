@@ -4,8 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-teloxide = { git = "https://github.com/teloxide/teloxide", branch = "master", features = ["macros"] }
+teloxide = { git = "https://github.com/teloxide/teloxide", features = ["macros", "cache-me", "throttle"], rev = "9901a57472a897c124f9147bf002ccc69a52ca3d"}
 log = "0.4"
 rand = "0.8.4"
 pretty_env_logger = "0.4"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
+lambda_http = "0.12.0"
+openssl = { version = "0.10", features = ["vendored"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+serde_json = "1.0.120"
+anyhow = "1.0.86"
