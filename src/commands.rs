@@ -1,5 +1,5 @@
 use teloxide::{requests::Requester, types::Message, utils::command::BotCommands};
-use tracing::debug;
+use tracing::{info, instrument};
 
 use crate::utils::{Bot, Context};
 
@@ -19,18 +19,14 @@ pub enum Command {
 }
 
 pub fn is_command(msg: &Message, context: &Context) -> Option<Command> {
-    let bot_name = context
-        .me
-        .username
-        .as_ref()
-        .expect("Bots must have a username");
-
     msg.text()
-        .and_then(|text| Command::parse(text, &bot_name).ok())
+        .and_then(|text| Command::parse(text, &context.bot_name).ok())
 }
 
+#[instrument(skip(bot))]
 pub async fn handle_command(bot: &Bot, msg: &Message, command: Command) -> anyhow::Result<()> {
-    debug!("Got command {:?}", command);
+    info!("Received command '{:?}'", command);
+
     match command {
         Command::Help => {
             bot.send_message(msg.chat.id, Command::descriptions().to_string())
