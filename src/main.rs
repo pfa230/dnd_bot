@@ -1,19 +1,21 @@
 use ::tracing::{info, instrument};
+use anyhow::Context;
 use commands::{handle_command, is_command, Command};
 use lambda_http::{run, service_fn, tracing, Body, Error, Request, RequestPayloadExt, Response};
 use rand::seq::SliceRandom;
 use teloxide::{
     prelude::*,
-    types::{InputFile, UpdateKind},
+    types::UpdateKind,
     utils::command::BotCommands,
 };
 use tracing::warn;
-use utils::{authorize, create_bot, error_response, success_response, Bot, Context};
+use utils::{
+    authorize, create_bot, error_response, init_context, is_maxim, success_response, Bot,
+    BotContext,
+};
 
 mod commands;
 mod utils;
-
-const MAXIM_IDS: [u64; 1] = [112553360];
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -30,24 +32,12 @@ async fn main() -> Result<(), Error> {
 
     // Cold start bot
     let bot = create_bot();
-
     // Set commands
     bot.set_my_commands(Command::bot_commands())
         .await
-        .expect("Error setting commands");
+        .context("Error setting commands")?;
 
-    // Populate context
-    let stickers = bot
-        .get_sticker_set("Smekhopanorama")
-        .await
-        .expect("Error getting stickers");
-    let me = bot.get_me().await.expect("Error getting 'me'");
-    let bot_name = me
-        .username
-        .as_deref()
-        .expect("Bots must have a username")
-        .to_owned();
-    let context = Context { stickers, bot_name };
+    let context = init_context(&bot).await?;
 
     run(service_fn(|req| {
         function_handler(bot.clone(), req, context.clone())
@@ -58,7 +48,7 @@ async fn main() -> Result<(), Error> {
 async fn function_handler(
     bot: Bot,
     event: Request,
-    context: Context,
+    context: BotContext,
 ) -> Result<Response<Body>, Error> {
     if let Err(e) = authorize(&event) {
         return error_response(401, format!("Unauthorized: {e}"));
@@ -88,16 +78,13 @@ async fn function_handler(
 }
 
 #[instrument(skip(bot, context))]
-async fn handle(bot: &Bot, msg: Message, context: &Context) -> anyhow::Result<()> {
+async fn handle(bot: &Bot, msg: Message, context: &BotContext) -> anyhow::Result<()> {
     if let Some(cmd) = is_command(&msg, context) {
-        match is_maxim(&msg) {
-            Some(()) => handle_maxim(bot, &msg, context).await,
-            None => handle_command(bot, &msg, cmd).await,
-        }
+        handle_command(bot, &msg, context, cmd).await
     } else if is_talking_to_bot(&msg, context) {
         match is_maxim(&msg) {
-            Some(()) => handle_maxim(bot, &msg, context).await,
-            None => handle_dialog(bot, &msg).await,
+            true => handle_maxim(bot, &msg, context).await,
+            false => handle_dialog(bot, &msg).await,
         }
     } else {
         info!("Message is not supported: {:?}", msg);
@@ -105,30 +92,23 @@ async fn handle(bot: &Bot, msg: Message, context: &Context) -> anyhow::Result<()
     }
 }
 
-fn is_maxim(msg: &Message) -> Option<()> {
-    msg.from()
-        .map(|user| MAXIM_IDS.iter().any(|maxim| *maxim == user.id.0))
-        .unwrap_or_default()
-        .then(|| ())
-}
-
 #[instrument(skip(bot, context))]
-async fn handle_maxim(bot: &Bot, msg: &Message, context: &Context) -> anyhow::Result<()> {
+async fn handle_maxim(bot: &Bot, msg: &Message, context: &BotContext) -> anyhow::Result<()> {
     warn!("Maxim is here!");
 
+    bot.send_message(msg.chat.id, "Привет, Максим!").await?;
+
     let sticker_file = context
-        .stickers
-        .stickers
-        .choose(&mut rand::thread_rng())
-        .map(|sticker| InputFile::file_id(sticker.file.id.to_string()));
-    match sticker_file {
-        Some(f) => bot.send_sticker(msg.chat.id, f).await?,
-        None => bot.send_message(msg.chat.id, "Not today").await?,
-    };
+        .petrosyan
+        .choose(&mut rand::thread_rng());
+    if let Some(f) = sticker_file {
+        bot.send_sticker(msg.chat.id, f.clone()).await?;
+    }
+    
     Ok(())
 }
 
-fn is_talking_to_bot(msg: &Message, context: &Context) -> bool {
+fn is_talking_to_bot(msg: &Message, context: &BotContext) -> bool {
     let at_name = format!("@{}", context.bot_name);
     match msg.chat.kind {
         teloxide::types::ChatKind::Private(_) => true,
