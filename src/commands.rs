@@ -40,11 +40,10 @@ pub fn is_command(msg: &Message, context: &BotContext) -> Option<Command> {
         .and_then(|text| Command::parse(text, &context.bot_name).ok())
 }
 
-#[instrument(skip(bot, context))]
+#[instrument(skip(bot))]
 pub async fn handle_command(
     bot: &Bot,
     msg: &Message,
-    context: &BotContext,
     command: Command,
 ) -> anyhow::Result<()> {
     info!("Received command '{:?}'", command);

@@ -80,7 +80,7 @@ async fn function_handler(
 #[instrument(skip(bot, context))]
 async fn handle(bot: &Bot, msg: Message, context: &BotContext) -> anyhow::Result<()> {
     if let Some(cmd) = is_command(&msg, context) {
-        handle_command(bot, &msg, context, cmd).await
+        handle_command(bot, &msg, cmd).await
     } else if is_talking_to_bot(&msg, context) {
         match is_maxim(&msg) {
             true => handle_maxim(bot, &msg, context).await,
