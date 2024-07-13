@@ -56,21 +56,11 @@ pub fn success_response() -> Result<Response<Body>, Error> {
 
 #[derive(Clone)]
 pub struct BotContext {
-    pub dice_sticker: InputFile,
     pub petrosyan: Vec<InputFile>,
     pub bot_name: String,
 }
 
 pub async fn init_context(bot: &Bot) -> anyhow::Result<BotContext> {
-    let dice_sticker_set = bot
-        .get_sticker_set("max_dice")
-        .await
-        .context("Error getting Max's dice")?;
-    let dice_sticker = dice_sticker_set
-        .stickers
-        .get(0)
-        .ok_or(anyhow!("Dice sticker set is empty"))?;
-
     let petrosyan = bot
         .get_sticker_set("Smekhopanorama")
         .await
@@ -84,7 +74,6 @@ pub async fn init_context(bot: &Bot) -> anyhow::Result<BotContext> {
         .to_owned();
 
     Ok(BotContext {
-        dice_sticker: InputFile::file_id(dice_sticker.file.id.to_string()),
         petrosyan: petrosyan
             .stickers
             .iter()

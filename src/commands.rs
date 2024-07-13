@@ -5,7 +5,7 @@ use teloxide::{
 };
 use tracing::{info, instrument};
 
-use crate::utils::{is_maxim, Bot, BotContext};
+use crate::utils::{Bot, BotContext};
 
 const MAX_DICE: usize = 5;
 
@@ -64,10 +64,7 @@ pub async fn handle_command(
                 .await?;
             } else {
                 for _ in 0..num_dice {
-                    match is_maxim(&msg) {
-                        true => bot.send_sticker(msg.chat.id, context.dice_sticker.clone()).await?,
-                        false => bot.send_dice(msg.chat.id).await?,
-                    };
+                    bot.send_dice(msg.chat.id).await?;
                 }
             };
         }
