@@ -58,14 +58,15 @@ pub async fn dispatch_update(bot: Bot, update: Update) -> anyhow::Result<()> {
     if let Err(err) = &ret {
         warn!("Error handling update: {:?}", err);
         if let Some(chat_id) = update.chat().map(|chat| chat.id) {
-            bot.send_message(
-                chat_id,
-                format!("Error handling update {}: {}", update.id.0, err),
-            )
-            .await?;
+            let _ = bot
+                .send_message(
+                    chat_id,
+                    format!("Error handling update {}: {}", update.id.0, err),
+                )
+                .await;
         }
     }
-    ret
+    Ok(())
 }
 
 #[instrument(skip(bot))]

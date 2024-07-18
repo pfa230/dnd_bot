@@ -1,4 +1,4 @@
-use std::{env};
+use std::env;
 
 use anyhow::{anyhow, bail};
 use lambda_http::{Body, Error, Request, Response};

@@ -15,3 +15,5 @@ Cargo.lock
 
 .DS_Store
 .env
+set_webhook.sh
+delete_webhook.sh

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
 use aws_sdk_s3::{operation::get_object::GetObjectError, primitives::ByteStream, Client};
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,7 @@ impl Tracker {
 
     async fn get_from_s3(&self) -> anyhow::Result<Items> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
-
+        
         let response = self
             .client
             .get_object()
@@ -105,17 +105,17 @@ impl Tracker {
                 warn!("Error fetching from S3: {:?}", sdk_err);
                 match sdk_err.into_service_error() {
                     GetObjectError::NoSuchKey(_) => Ok(Items(Vec::new())),
-                    err => Err(anyhow!("{:?}", err)),
+                    err => Err(err),
                 }
             }
         }
+        .with_context(|| "Error fetching from S3")
     }
 
     async fn put_to_s3(&self, items: &Items) -> anyhow::Result<()> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
 
-        let response = self
-            .client
+        self.client
             .put_object()
             .bucket(bucket)
             .key(&self.name)
@@ -123,13 +123,9 @@ impl Tracker {
                 serde_json::to_string_pretty(&items)?.as_bytes().to_owned(),
             ))
             .send()
-            .await;
-        if let Err(sdk_err) = response {
-            warn!("Error fetching from S3: {:?}", sdk_err);
-            Err(anyhow!("{:?}", sdk_err))
-        } else {
-            Ok(())
-        }
+            .await
+            .with_context(|| "Error putting to S3")?;
+        Ok(())
     }
 }
 

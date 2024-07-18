@@ -31,7 +31,7 @@ impl CallbackAction {
             CallbackAction::SubHarm => format!("{} -1", item_name),
             CallbackAction::DeleteHarm => format!("Delete {}", item_name),
             CallbackAction::AddStress => format!("{} +1", item_name),
-            CallbackAction::SubStress => format!("{} +1", item_name),
+            CallbackAction::SubStress => format!("{} -1", item_name),
             CallbackAction::DeleteStress => format!("Delete {}", item_name),
         }
     }

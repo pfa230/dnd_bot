@@ -2,17 +2,17 @@ use std::env;
 
 use ::tracing::{info, instrument};
 use anyhow::{anyhow, Context};
-use dispatcher::{dispatch_update,  Command};
+use dispatcher::{dispatch_update, Command};
 use dotenv::dotenv;
 use lambda_http::{run, service_fn, tracing, Body, Error, Request, RequestPayloadExt, Response};
 use teloxide::{prelude::*, utils::command::BotCommands};
 use utils::{authorize, create_bot, error_response, success_response, Bot};
 
+mod callback;
 mod context;
 mod dispatcher;
 mod handler;
 mod inline;
-mod callback;
 mod tracker;
 mod utils;
 
@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+#[instrument(skip(bot))]
 async fn run_on_lambda(bot: Bot) -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
