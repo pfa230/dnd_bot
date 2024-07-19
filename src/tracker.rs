@@ -4,7 +4,7 @@ use aws_sdk_s3::{operation::get_object::GetObjectError, primitives::ByteStream, 
 use serde::{Deserialize, Serialize};
 use std::env;
 use teloxide::types::ChatId;
-use tracing::warn;
+use tracing::{info, instrument, warn};
 
 const S3_BUCKET_ENV_VAR: &str = "S3_BUCKET";
 
@@ -26,18 +26,27 @@ pub struct Tracker {
 }
 
 impl Tracker {
+    #[instrument]
     pub async fn new(name: &str, chat_id: ChatId) -> Self {
         let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
         let config = aws_config::defaults(BehaviorVersion::latest())
             .region(region_provider)
             .load()
             .await;
+
+        let dir = if chat_id.0 < 0 {
+            format!("_{}", -chat_id.0)
+        } else {
+            chat_id.to_string()
+        };
+
         Self {
             client: Client::new(&config),
-            s3_path: format!("{}/{}.json", chat_id, name.to_owned()),
+            s3_path: format!("{}/{}.json", dir, name.to_owned()),
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn add(&mut self, name: &str, start_value: i32) -> anyhow::Result<Item> {
         let mut items = self.get_from_s3().await?;
 
@@ -46,14 +55,17 @@ impl Tracker {
         Ok(item)
     }
 
+    #[instrument(skip_all)]
     pub async fn list(&self) -> anyhow::Result<Vec<Item>> {
         Ok(self.get_from_s3().await?.0)
     }
 
+    #[instrument(skip_all)]
     pub async fn get(&self, id: usize) -> anyhow::Result<Item> {
         self.get_from_s3().await?.get(id)
     }
 
+    #[instrument(skip_all)]
     pub async fn change(&mut self, id: usize, amount: i32) -> anyhow::Result<Item> {
         let mut items = self.get_from_s3().await?;
         let ret = items.change(id, amount);
@@ -61,6 +73,7 @@ impl Tracker {
         ret
     }
 
+    #[instrument(skip_all)]
     pub async fn delete(&mut self, id: usize) -> anyhow::Result<Item> {
         let mut items = self.get_from_s3().await?;
         let ret = items.delete(id);
@@ -68,6 +81,7 @@ impl Tracker {
         ret
     }
 
+    #[instrument(skip_all)]
     pub async fn tick(&mut self, id: usize) -> anyhow::Result<Option<Item>> {
         let item = self.change(id, -1).await?;
         if item.value <= 0 {
@@ -78,6 +92,7 @@ impl Tracker {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn reset(&self) -> anyhow::Result<()> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
         self.client
@@ -89,8 +104,10 @@ impl Tracker {
         Ok(())
     }
 
+    #[instrument(skip(self), fields(s3_path = %self.s3_path))]
     async fn get_from_s3(&self) -> anyhow::Result<Items> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
+        info!("Fetching from S3 bucket {}", bucket);
 
         let response = self
             .client
@@ -114,8 +131,10 @@ impl Tracker {
         .with_context(|| "Error fetching from S3")
     }
 
+    #[instrument(skip_all, fields(s3_path = %self.s3_path))]
     async fn put_to_s3(&self, items: &Items) -> anyhow::Result<()> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
+        info!("Writing to S3 bucket {}", bucket);
 
         self.client
             .put_object()
