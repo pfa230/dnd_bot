@@ -19,27 +19,27 @@ use crate::utils::Bot;
     parse_with = "split"
 )]
 pub enum Command {
-    #[command(description = "- display this text.")]
+    #[command(description = "display this text")]
     Help,
-    #[command(description = "yes - clears everything.")]
+    #[command(description = "clears everything")]
     Reset(String),
-    #[command(description = "- rolls 1 die.")]
+    #[command(description = "rolls 1 die")]
     R1,
-    #[command(description = "- rolls 2 dice.")]
+    #[command(description = "rolls 2 dice")]
     R2,
-    #[command(description = "- rolls 3 dice.")]
+    #[command(description = "rolls 3 dice")]
     R3,
-    #[command(description = "- manage timers.")]
+    #[command(description = "manage timers")]
     T,
-    #[command(description = "<name> <start_value> - add timer.")]
+    #[command(description = "`<name> <start_value>` - add timer")]
     Ta(String, u16),
-    #[command(description = "- manage harm.")]
+    #[command(description = "manage harm")]
     A,
-    #[command(description = "<name> - add harm recipient.")]
+    #[command(description = "`<name>` - add harm recipient")]
     Aa(String),
-    #[command(description = "- manage stress.")]
+    #[command(description = "manage stress")]
     S,
-    #[command(description = "<name> - add stress recipient.")]
+    #[command(description = "`<name>` - add stress recipient")]
     Sa(String),
 }
 
@@ -57,10 +57,10 @@ pub async fn dispatch_update(bot: Bot, update: Update) -> anyhow::Result<()> {
     };
     if let Err(err) = &ret {
         warn!("Error handling update: {:?}", err);
-        if let Some(chat_id) = update.chat().map(|chat| chat.id) {
+        if let Some(chat) = update.chat() {
             let _ = bot
                 .send_message(
-                    chat_id,
+                    chat.id,
                     format!("Error handling update {}: {}", update.id.0, err),
                 )
                 .await;
