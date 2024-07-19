@@ -1,12 +1,12 @@
 use std::env;
 
 use ::tracing::{info, instrument};
-use anyhow::{anyhow, Context};
-use dispatcher::{dispatch_update, Command};
+use anyhow::anyhow;
+use dispatcher::dispatch_update;
 use dotenv::dotenv;
 use lambda_http::{run, service_fn, tracing, Body, Error, Request, RequestPayloadExt, Response};
-use teloxide::{prelude::*, utils::command::BotCommands};
-use utils::{authorize, create_bot, error_response, success_response, Bot};
+use teloxide::prelude::*;
+use utils::{authorize, error_response, init_bot, success_response, Bot};
 
 mod callback;
 mod context;
@@ -18,16 +18,12 @@ mod utils;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Cold start bot
-    let bot = create_bot();
-    // Set commands
-    bot.set_my_commands(Command::bot_commands())
-        .await
-        .context("Error setting commands")?;
-
     match env::var("ON_LAMBDA").as_deref() {
-        Ok("1") => run_on_lambda(bot).await,
-        _ => run_locally(bot).await,
+        Ok("1") => run_on_lambda(init_bot().await).await,
+        _ => {
+            dotenv().ok();
+            run_locally(init_bot().await).await
+        }
     }
 }
 
@@ -73,7 +69,6 @@ async fn handle_lambda_request(bot: Bot, request: Request) -> Result<Response<Bo
 
 #[instrument(skip(bot))]
 async fn run_locally(bot: Bot) -> anyhow::Result<()> {
-    dotenv().ok();
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .pretty()

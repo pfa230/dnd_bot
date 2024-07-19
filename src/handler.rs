@@ -96,7 +96,7 @@ impl BotHandler {
 
     pub async fn handle_delete_timer(&self, id: usize) -> anyhow::Result<()> {
         let timer = self.context.delete_timer(id).await?;
-        self.send_response(format!("Timer *{}* removed.", &timer.name))
+        self.send_response(format!("Timer *{}* removed", &timer.name))
             .await
     }
 
@@ -131,7 +131,7 @@ impl BotHandler {
 
     pub async fn handle_delete_harm(&self, id: usize) -> anyhow::Result<()> {
         let harm = self.context.delete_harm(id).await?;
-        self.send_response(format!("Harm recipient *{}* removed.", &harm.name))
+        self.send_response(format!("Harm recipient *{}* removed", &harm.name))
             .await
     }
 
@@ -166,7 +166,7 @@ impl BotHandler {
 
     pub async fn handle_delete_stress(&self, id: usize) -> anyhow::Result<()> {
         let stress = self.context.delete_stress(id).await?;
-        self.send_response(format!("Stress recipient *{}* removed.", &stress.name))
+        self.send_response(format!("Stress recipient *{}* removed", &stress.name))
             .await
     }
 

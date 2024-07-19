@@ -4,20 +4,29 @@ use anyhow::{anyhow, bail};
 use lambda_http::{Body, Error, Request, Response};
 use teloxide::{
     adaptors::{CacheMe, DefaultParseMode},
+    prelude::*,
     requests::RequesterExt,
     types::ParseMode,
+    utils::command::BotCommands,
 };
 use tracing::{info, warn};
+
+use crate::dispatcher::Command;
 
 static SECRET_TOKEN_HEADER: &str = "x-telegram-bot-api-secret-token";
 static SECRET_TOKEN_ENV_VAR: &str = "AUTH_TOKEN";
 
 pub type Bot = DefaultParseMode<CacheMe<teloxide::Bot>>;
 
-pub fn create_bot() -> Bot {
-    teloxide::Bot::from_env() /* .throttle(Limits::default())*/
+pub async fn init_bot() -> Bot {
+    let bot = teloxide::Bot::from_env() /* .throttle(Limits::default())*/
         .cache_me()
-        .parse_mode(ParseMode::MarkdownV2)
+        .parse_mode(ParseMode::MarkdownV2);
+
+    bot.set_my_commands(Command::bot_commands())
+        .await
+        .expect("Error setting commands");
+    bot
 }
 
 pub fn authorize(event: &Request) -> anyhow::Result<()> {
