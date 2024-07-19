@@ -31,15 +31,15 @@ pub enum Command {
     R3,
     #[command(description = "manage timers")]
     T,
-    #[command(description = "`\\<name\\> \\<start_value\\>` \\- add timer")]
+    #[command(description = "<name> <start_value> - add timer")]
     Ta(String, u16),
     #[command(description = "manage harm")]
     A,
-    #[command(description = "`\\<name\\>` \\- add harm recipient")]
+    #[command(description = "<name> - add harm recipient")]
     Aa(String),
     #[command(description = "manage stress")]
     S,
-    #[command(description = "`\\<name\\>` \\- add stress recipient")]
+    #[command(description = "`<name>` - add stress recipient")]
     Sa(String),
 }
 

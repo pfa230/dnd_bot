@@ -1,15 +1,21 @@
-
 use anyhow::{anyhow, bail};
 
 use crate::{
     callback::{make_harm_keyboard, make_stress_keyboard, make_timers_keyboard},
     context::BotContext,
-    utils::Bot,
+    utils::{Bot, MarkdownBot},
 };
-use teloxide::{payloads::SendMessageSetters, prelude::*, types::User, utils::markdown};
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::*,
+    types::{ParseMode, User},
+    utils::markdown::{self, escape},
+};
 
 pub struct BotHandler {
     pub bot: Bot,
+    pub markdown_bot: MarkdownBot,
+
     context: BotContext,
     chat_id: ChatId,
     from: User,
@@ -17,13 +23,15 @@ pub struct BotHandler {
 
 impl BotHandler {
     pub async fn new(bot: Bot, update: &Update) -> anyhow::Result<Self> {
+        let chat_id = update.chat().ok_or(anyhow!("Chat not found"))?.id;
         Ok(Self {
-            bot,
-            context: BotContext::new().await,
-            chat_id: update.chat().ok_or(anyhow!("Chat not found"))?.id,
+            bot: bot.clone(),
+            markdown_bot: bot.parse_mode(ParseMode::MarkdownV2),
+            context: BotContext::new(chat_id).await,
+            chat_id,
             from: update
                 .from()
-                .ok_or(anyhow!("Cannot find \\'from\\' user"))?
+                .ok_or(anyhow!("Cannot find 'from' user"))?
                 .to_owned(),
         })
     }
@@ -83,7 +91,7 @@ impl BotHandler {
                 .await
             }
             None => {
-                self.send_response(format!("Timer *{}* has fired\\!", &timer.name))
+                self.send_response(format!("Timer *{}* has fired!", &timer.name))
                     .await
             }
         }
@@ -171,10 +179,10 @@ impl BotHandler {
     }
 
     async fn send_response(&self, text: String) -> anyhow::Result<()> {
-        self.bot
+        self.markdown_bot
             .send_message(
                 self.chat_id,
-                format!("{} by {}", text, markdown::user_mention_or_link(&self.from)),
+                escape(&format!("{} by {}", text, markdown::user_mention_or_link(&self.from))),
             )
             .await?;
         Ok(())

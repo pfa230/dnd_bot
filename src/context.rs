@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use teloxide::types::ChatId;
 use tokio::sync::Mutex;
 
 use crate::tracker::{Item, Tracker};
@@ -12,11 +13,11 @@ pub struct BotContext {
 }
 
 impl BotContext {
-    pub async fn new() -> Self {
+    pub async fn new(chat_id: ChatId) -> Self {
         BotContext {
-            timers: Arc::new(Mutex::new(Tracker::new("timers").await)),
-            harm: Arc::new(Mutex::new(Tracker::new("harm").await)),
-            stress: Arc::new(Mutex::new(Tracker::new("stress").await)),
+            timers: Arc::new(Mutex::new(Tracker::new("timers", chat_id).await)),
+            harm: Arc::new(Mutex::new(Tracker::new("harm", chat_id).await)),
+            stress: Arc::new(Mutex::new(Tracker::new("stress", chat_id).await)),
         }
     }
 

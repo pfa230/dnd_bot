@@ -10,6 +10,7 @@ rand = "0.8.4"
 pretty_env_logger = "0.4"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 lambda_http = "0.12.0"
+lambda_runtime = { version = "0.12.0" }
 openssl = { version = "0.10", features = ["vendored"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"

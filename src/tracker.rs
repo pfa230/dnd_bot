@@ -3,6 +3,7 @@ use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
 use aws_sdk_s3::{operation::get_object::GetObjectError, primitives::ByteStream, Client};
 use serde::{Deserialize, Serialize};
 use std::env;
+use teloxide::types::ChatId;
 use tracing::warn;
 
 const S3_BUCKET_ENV_VAR: &str = "S3_BUCKET";
@@ -18,13 +19,14 @@ pub struct Item {
 #[derive(Clone, Serialize, Deserialize)]
 struct Items(Vec<Item>);
 
+#[derive(Clone)]
 pub struct Tracker {
     client: Client,
-    name: String,
+    s3_path: String,
 }
 
 impl Tracker {
-    pub async fn new(name: &str) -> Self {
+    pub async fn new(name: &str, chat_id: ChatId) -> Self {
         let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
         let config = aws_config::defaults(BehaviorVersion::latest())
             .region(region_provider)
@@ -32,7 +34,7 @@ impl Tracker {
             .await;
         Self {
             client: Client::new(&config),
-            name: name.to_owned(),
+            s3_path: format!("{}/{}.json", chat_id, name.to_owned()),
         }
     }
 
@@ -81,7 +83,7 @@ impl Tracker {
         self.client
             .delete_object()
             .bucket(bucket)
-            .key(&self.name)
+            .key(&self.s3_path)
             .send()
             .await?;
         Ok(())
@@ -89,12 +91,12 @@ impl Tracker {
 
     async fn get_from_s3(&self) -> anyhow::Result<Items> {
         let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
-        
+
         let response = self
             .client
             .get_object()
             .bucket(bucket)
-            .key(&self.name)
+            .key(&self.s3_path)
             .send()
             .await;
         match response {
@@ -118,7 +120,7 @@ impl Tracker {
         self.client
             .put_object()
             .bucket(bucket)
-            .key(&self.name)
+            .key(&self.s3_path)
             .body(ByteStream::from(
                 serde_json::to_string_pretty(&items)?.as_bytes().to_owned(),
             ))
