@@ -7,10 +7,10 @@ use teloxide::{
 };
 use tracing::{info, instrument, warn};
 
-use crate::callback::Callback;
 use crate::callback::CallbackAction;
 use crate::handler::BotHandler;
 use crate::utils::Bot;
+use crate::{callback::Callback, utils::debug_err};
 
 #[derive(BotCommands, PartialEq, Clone, Debug)]
 #[command(
@@ -47,7 +47,17 @@ pub async fn dispatch_update(bot: Bot, update: Update) -> anyhow::Result<()> {
     let handler = match BotHandler::new(bot, &update).await {
         Ok(handler) => handler,
         Err(err) => {
-            warn!("Error creating handler: {}", err);
+            let err = err.context(format!(
+                "Error creating handler. Update ID {}, user {}",
+                update.id.0,
+                update
+                    .from()
+                    .map(|u| u.username.as_deref())
+                    .flatten()
+                    .unwrap_or("<>")
+            ));
+            warn!("{}", &err);
+            debug_err(&err).await;
             return Ok(());
         }
     };
@@ -60,20 +70,21 @@ pub async fn dispatch_update(bot: Bot, update: Update) -> anyhow::Result<()> {
             Ok(())
         }
     };
-    if let Err(err) = &ret {
-        warn!("Error handling update: {:?}", err);
-        if let Some(chat) = update.chat() {
-            let _ = handler
-                .bot
-                .send_message(
-                    chat.id,
-                    format!("Error handling update {}: {}", update.id.0, err),
-                )
-                .await;
-        }
+    if let Err(err) = ret {
+        let err = err.context(format!(
+            "Error handling update. Update ID {}, user {}",
+            update.id.0,
+            update
+                .from()
+                .map(|u| u.username.as_deref())
+                .flatten()
+                .unwrap_or("<>")
+        ));
+        warn!("{}", &err);
+        debug_err(&err).await;
     }
     Ok(())
-} 
+}
 
 #[instrument(skip(handler), fields(from = %handler.format_user()))]
 pub async fn dispatch_callback(handler: &BotHandler, cb: &CallbackQuery) -> anyhow::Result<()> {

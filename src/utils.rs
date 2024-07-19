@@ -14,6 +14,7 @@ use crate::dispatcher::Command;
 
 static SECRET_TOKEN_HEADER: &str = "x-telegram-bot-api-secret-token";
 static SECRET_TOKEN_ENV_VAR: &str = "AUTH_TOKEN";
+static DEBUG_CHAT_ID_ENV_VAR: &str = "DEBUG_CHAT_ID";
 
 pub type Bot = CacheMe<teloxide::Bot>;
 pub type MarkdownBot = DefaultParseMode<CacheMe<teloxide::Bot>>;
@@ -58,4 +59,15 @@ pub fn success_response() -> Result<Response<Body>, Error> {
         .status(200)
         .body(Body::Empty)
         .unwrap())
+}
+
+pub async fn debug_err(err: &anyhow::Error) {
+    if let Ok(chat_id) = env::var(DEBUG_CHAT_ID_ENV_VAR)
+        .unwrap_or("invalid".to_string())
+        .parse::<i64>()
+    {
+        let _ = teloxide::Bot::from_env()
+            .send_message(ChatId(chat_id), err.to_string())
+            .await;
+    }
 }

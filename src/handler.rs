@@ -73,7 +73,9 @@ impl BotHandler {
     pub async fn handle_create_player(&self, name: &str) -> anyhow::Result<()> {
         let name = name.trim();
         if name.is_empty() {
-            self.markdown_bot.send_message(self.chat_id, "Player name is required").await?;
+            self.markdown_bot
+                .send_message(self.chat_id, "Player name is required")
+                .await?;
             return Ok(());
         }
         self.context.create_harm(name).await?;
@@ -106,28 +108,30 @@ impl BotHandler {
 
     #[instrument(skip(self))]
     pub async fn handle_tick_timer(&self, id: usize) -> anyhow::Result<()> {
-        let timer = self.context.get_timer(id).await?;
-        match self.context.tick_timer(id).await? {
-            Some(timer) => {
+        if let Some(timer) = self.context.tick_timer(id).await? {
+            if timer.value <= 0 {
+                self.context.delete_timer(id).await?;
+                self.send_response(format!("Timer *{}* has fired\\!", escape(&timer.name)))
+                    .await?;
+            } else {
                 self.send_response(format!(
                     "Timer *{}* has *{}* ticks left",
                     escape(&timer.name),
                     escape(&timer.value.to_string())
                 ))
-                .await
-            }
-            None => {
-                self.send_response(format!("Timer *{}* has fired\\!", escape(&timer.name)))
-                    .await
+                .await?;
             }
         }
+        Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn handle_delete_timer(&self, id: usize) -> anyhow::Result<()> {
-        let timer = self.context.delete_timer(id).await?;
-        self.send_response(format!("Timer *{}* removed", escape(&timer.name)))
-            .await
+        if let Some(timer) = self.context.delete_timer(id).await? {
+            self.send_response(format!("Timer *{}* removed", escape(&timer.name)))
+                .await?;
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -147,20 +151,24 @@ impl BotHandler {
 
     #[instrument(skip(self))]
     pub async fn handle_change_harm(&self, id: usize, change: i32) -> anyhow::Result<()> {
-        let new_harm = self.context.change_harm(id, change).await?;
-        self.send_response(format!(
-            "*{}* now has *{}* harm",
-            escape(&new_harm.name),
-            escape(&new_harm.value.to_string())
-        ))
-        .await
+        if let Some(new_harm) = self.context.change_harm(id, change).await? {
+            self.send_response(format!(
+                "*{}* now has *{}* harm",
+                escape(&new_harm.name),
+                escape(&new_harm.value.to_string())
+            ))
+            .await?;
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn handle_delete_harm(&self, id: usize) -> anyhow::Result<()> {
-        let harm = self.context.delete_harm(id).await?;
-        self.send_response(format!("Harm recipient *{}* removed", escape(&harm.name)))
-            .await
+        if let Some(harm) = self.context.delete_harm(id).await? {
+            self.send_response(format!("Harm recipient *{}* removed", escape(&harm.name)))
+                .await?;
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -180,23 +188,27 @@ impl BotHandler {
 
     #[instrument(skip(self))]
     pub async fn handle_change_stress(&self, id: usize, change: i32) -> anyhow::Result<()> {
-        let new_stress = self.context.change_stress(id, change).await?;
-        self.send_response(format!(
-            "*{}* now has *{}* stress",
-            escape(&new_stress.name),
-            escape(&new_stress.value.to_string())
-        ))
-        .await
+        if let Some(new_stress) = self.context.change_stress(id, change).await? {
+            self.send_response(format!(
+                "*{}* now has *{}* stress",
+                escape(&new_stress.name),
+                escape(&new_stress.value.to_string())
+            ))
+            .await?;
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn handle_delete_stress(&self, id: usize) -> anyhow::Result<()> {
-        let stress = self.context.delete_stress(id).await?;
-        self.send_response(format!(
-            "Stress recipient *{}* removed",
-            escape(&stress.name)
-        ))
-        .await
+        if let Some(stress) = self.context.delete_stress(id).await? {
+            self.send_response(format!(
+                "Stress recipient *{}* removed",
+                escape(&stress.name)
+            ))
+            .await?;
+        }
+        Ok(())
     }
 
     #[instrument(skip(self))]

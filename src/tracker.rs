@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
 use aws_sdk_s3::{operation::get_object::GetObjectError, primitives::ByteStream, Client};
 use serde::{Deserialize, Serialize};
@@ -60,36 +60,25 @@ impl Tracker {
         Ok(self.get_from_s3().await?.0)
     }
 
-    #[instrument(skip_all)]
-    pub async fn get(&self, id: usize) -> anyhow::Result<Item> {
-        self.get_from_s3().await?.get(id)
-    }
+    // #[instrument(skip_all)]
+    // pub async fn get(&self, id: usize) -> anyhow::Result<Option<Item>> {
+    //     Ok(self.get_from_s3().await?.get(id))
+    // }
 
     #[instrument(skip_all)]
-    pub async fn change(&mut self, id: usize, amount: i32) -> anyhow::Result<Item> {
+    pub async fn change(&mut self, id: usize, amount: i32) -> anyhow::Result<Option<Item>> {
         let mut items = self.get_from_s3().await?;
         let ret = items.change(id, amount);
         self.put_to_s3(&items).await?;
-        ret
+        Ok(ret)
     }
 
     #[instrument(skip_all)]
-    pub async fn delete(&mut self, id: usize) -> anyhow::Result<Item> {
+    pub async fn delete(&mut self, id: usize) -> anyhow::Result<Option<Item>> {
         let mut items = self.get_from_s3().await?;
         let ret = items.delete(id);
         self.put_to_s3(&items).await?;
-        ret
-    }
-
-    #[instrument(skip_all)]
-    pub async fn tick(&mut self, id: usize) -> anyhow::Result<Option<Item>> {
-        let item = self.change(id, -1).await?;
-        if item.value <= 0 {
-            self.delete(id).await?;
-            Ok(None)
-        } else {
-            Ok(Some(item))
-        }
+        Ok(ret)
     }
 
     #[instrument(skip_all)]
@@ -151,35 +140,28 @@ impl Tracker {
 }
 
 impl Items {
-    fn change(&mut self, id: usize, amount: i32) -> anyhow::Result<Item> {
-        let item = self
-            .0
-            .iter_mut()
-            .find(|item| item.id == id)
-            .ok_or(anyhow!("Item not found"))?;
+    fn change(&mut self, id: usize, amount: i32) -> Option<Item> {
+        let item = match self.0.iter_mut().find(|item| item.id == id) {
+            Some(item) => item,
+            None => {
+                return None;
+            }
+        };
 
-        item.value = item
-            .value
-            .checked_add(amount)
-            .ok_or(anyhow!("Overflow for item '{}'", item.name))?;
-        Ok(item.clone())
+        item.value = item.value.checked_add(amount).expect("Overflow for item");
+        Some(item.clone())
     }
 
-    fn get(&self, id: usize) -> anyhow::Result<Item> {
-        self.0
-            .iter()
-            .find(|item| item.id == id)
-            .map(|item| item.clone())
-            .ok_or(anyhow!("Item not found"))
-    }
+    // fn get(&self, id: usize) -> Option<Item> {
+    //     self.0
+    //         .iter()
+    //         .find(|item| item.id == id)
+    //         .map(|item| item.clone())
+    // }
 
-    fn delete(&mut self, id: usize) -> anyhow::Result<Item> {
-        let pos = self
-            .0
-            .iter()
-            .position(|item| item.id == id)
-            .ok_or(anyhow!("Item not found"))?;
-        Ok(self.0.remove(pos))
+    fn delete(&mut self, id: usize) -> Option<Item> {
+        let pos = self.0.iter().position(|item| item.id == id);
+        pos.and_then(|pos| Some(self.0.remove(pos)))
     }
 
     fn next_id(&self) -> usize {

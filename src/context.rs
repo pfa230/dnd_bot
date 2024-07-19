@@ -37,16 +37,16 @@ impl BotContext {
         self.timers.lock().await.list().await
     }
 
-    pub async fn get_timer(&self, id: usize) -> anyhow::Result<Item> {
-        self.timers.lock().await.get(id).await
+    // pub async fn get_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
+    // self.timers.lock().await.get(id).await
+    // }
+
+    pub async fn delete_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
+        self.timers.lock().await.delete(id).await
     }
 
     pub async fn tick_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
-        self.timers.lock().await.tick(id).await
-    }
-
-    pub async fn delete_timer(&self, id: usize) -> anyhow::Result<Item> {
-        self.timers.lock().await.delete(id).await
+        self.timers.lock().await.change(id, -1).await
     }
 
     // Harm
@@ -58,11 +58,11 @@ impl BotContext {
         self.harm.lock().await.list().await
     }
 
-    pub async fn change_harm(&self, id: usize, change: i32) -> anyhow::Result<Item> {
+    pub async fn change_harm(&self, id: usize, change: i32) -> anyhow::Result<Option<Item>> {
         self.harm.lock().await.change(id, change).await
     }
 
-    pub async fn delete_harm(&self, id: usize) -> anyhow::Result<Item> {
+    pub async fn delete_harm(&self, id: usize) -> anyhow::Result<Option<Item>> {
         self.harm.lock().await.delete(id).await
     }
 
@@ -75,11 +75,11 @@ impl BotContext {
         self.stress.lock().await.list().await
     }
 
-    pub async fn change_stress(&self, id: usize, change: i32) -> anyhow::Result<Item> {
+    pub async fn change_stress(&self, id: usize, change: i32) -> anyhow::Result<Option<Item>> {
         self.stress.lock().await.change(id, change).await
     }
 
-    pub async fn delete_stress(&self, id: usize) -> anyhow::Result<Item> {
+    pub async fn delete_stress(&self, id: usize) -> anyhow::Result<Option<Item>> {
         self.stress.lock().await.delete(id).await
     }
 }
