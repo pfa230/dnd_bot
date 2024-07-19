@@ -67,7 +67,7 @@ pub async fn debug_err(err: &anyhow::Error) {
         .parse::<i64>()
     {
         let _ = teloxide::Bot::from_env()
-            .send_message(ChatId(chat_id), err.to_string())
+            .send_message(ChatId(chat_id), format!("{:#?}", err))
             .await;
     }
 }
