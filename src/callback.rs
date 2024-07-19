@@ -25,7 +25,7 @@ pub struct Callback {
 impl CallbackAction {
     fn button_name(&self, item_name: &str) -> String {
         match self {
-            CallbackAction::TickTimer => format!("Tick {}", item_name),
+            CallbackAction::TickTimer => format!("{} -1", item_name),
             CallbackAction::DeleteTimer => format!("Delete {}", item_name),
             CallbackAction::AddHarm => format!("{} +1", item_name),
             CallbackAction::SubHarm => format!("{} -1", item_name),
