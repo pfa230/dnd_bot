@@ -1,114 +1,139 @@
-use crate::tracker::Item;
 use anyhow::bail;
 use std::str::FromStr;
 use strum::{AsRefStr, EnumString};
-use teloxide::types::{ChatId, InlineKeyboardButton, InlineKeyboardMarkup};
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
+
+use crate::tracker::{Player, Timer};
 
 #[derive(Clone, EnumString, AsRefStr)]
 pub enum CallbackAction {
-    TickTimer,
+    NoAction,
+    AddTimer,
+    SubTimer,
     DeleteTimer,
     AddHarm,
     SubHarm,
-    DeleteHarm,
     AddStress,
     SubStress,
-    DeleteStress,
+    DeletePlayer,
+    ShowTimersKb,
+    ShowPlayersKb,
+    ShowHarmKb,
+    ShowStressKb,
+    HideTimersKb,
+    HidePlayersKb,
 }
 
 pub struct Callback {
-    pub id: usize,
-    pub chat_id: ChatId,
+    pub item_id: usize,
     pub action: CallbackAction,
-}
-
-impl CallbackAction {
-    fn button_name(&self, item_name: &str) -> String {
-        match self {
-            CallbackAction::TickTimer => format!("{} -1", item_name),
-            CallbackAction::DeleteTimer => format!("Delete {}", item_name),
-            CallbackAction::AddHarm => format!("{} +1", item_name),
-            CallbackAction::SubHarm => format!("{} -1", item_name),
-            CallbackAction::DeleteHarm => format!("Delete {}", item_name),
-            CallbackAction::AddStress => format!("{} +1", item_name),
-            CallbackAction::SubStress => format!("{} -1", item_name),
-            CallbackAction::DeleteStress => format!("Delete {}", item_name),
-        }
-    }
 }
 
 impl Callback {
     fn serialize(&self) -> String {
-        format!(
-            "{}|{}|{}",
-            self.id,
-            self.chat_id,
-            self.action.as_ref()
-        )
+        format!("{}|{}", self.item_id, self.action.as_ref())
     }
 
     pub fn deserialize(cb: &str) -> anyhow::Result<Self> {
         let split = cb.split("|").collect::<Vec<_>>();
-        if split.len() != 3 {
+        if split.len() != 2 {
             bail!("Invalid callback data: {}", cb);
         }
         Ok(Callback {
-            id: split[0].parse()?,
-            chat_id: ChatId(split[1].parse()?),
-            action: CallbackAction::from_str(split[2])?,
+            item_id: split[0].parse()?,
+            action: CallbackAction::from_str(split[1])?,
         })
     }
 }
 
-pub fn make_timers_keyboard(chat_id: ChatId, timers: &[Item]) -> InlineKeyboardMarkup {
+pub fn make_manage_timers_keyboard(timers: &[Timer]) -> InlineKeyboardMarkup {
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
 
-    for timer in timers {
+    for timer in timers.iter() {
         keyboard.push(vec![
-            create_button(chat_id, &timer, CallbackAction::TickTimer),
-            create_button(chat_id, &timer, CallbackAction::DeleteTimer),
+            create_button(timer.id, timer.name.as_str(), CallbackAction::NoAction),
+            create_button(timer.id, "+1", CallbackAction::AddTimer),
+            create_button(timer.id, "-1", CallbackAction::SubTimer),
+            create_button(timer.id, "Delete", CallbackAction::DeleteTimer),
         ]);
     }
+    // keyboard.push(vec![create_button(0, "Hide", CallbackAction::HideTimersKb)]);
 
     InlineKeyboardMarkup::new(keyboard)
 }
 
-pub fn make_harm_keyboard(chat_id: ChatId, items: &[Item]) -> InlineKeyboardMarkup {
+pub fn make_manage_harm_keyboard(players: &[Player]) -> InlineKeyboardMarkup {
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
 
-    for item in items {
+    for player in players.iter() {
         keyboard.push(vec![
-            create_button(chat_id, &item, CallbackAction::AddHarm),
-            create_button(chat_id, &item, CallbackAction::SubHarm),
-            create_button(chat_id, &item, CallbackAction::DeleteHarm),
+            create_button(player.id, player.name.as_str(), CallbackAction::NoAction),
+            create_button(player.id, "+1 harm", CallbackAction::AddHarm),
+            create_button(player.id, "-1 harm", CallbackAction::SubHarm),
         ]);
     }
+    keyboard.push(vec![create_button(0, "Back", CallbackAction::HidePlayersKb)]);
 
     InlineKeyboardMarkup::new(keyboard)
 }
 
-pub fn make_stress_keyboard(chat_id: ChatId, items: &[Item]) -> InlineKeyboardMarkup {
+pub fn make_manage_stress_keyboard(players: &[Player]) -> InlineKeyboardMarkup {
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
 
-    for item in items {
+    for player in players.iter() {
         keyboard.push(vec![
-            create_button(chat_id, &item, CallbackAction::AddStress),
-            create_button(chat_id, &item, CallbackAction::SubStress),
-            create_button(chat_id, &item, CallbackAction::DeleteStress),
+            create_button(player.id, player.name.as_str(), CallbackAction::NoAction),
+            create_button(player.id, "+1 stress", CallbackAction::AddStress),
+            create_button(player.id, "-1 stress", CallbackAction::SubStress),
         ]);
     }
+    keyboard.push(vec![create_button(0, "Back", CallbackAction::HidePlayersKb)]);
 
     InlineKeyboardMarkup::new(keyboard)
 }
 
-fn create_button(chat_id: ChatId, item: &Item, action: CallbackAction) -> InlineKeyboardButton {
-    InlineKeyboardButton::callback(
-        action.button_name(&item.name),
-        Callback {
-            id: item.id,
-            chat_id,
-            action,
-        }
-        .serialize(),
-    )
+pub fn make_manage_players_keyboard(players: &[Player]) -> InlineKeyboardMarkup {
+    let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+
+    for player in players.iter() {
+        keyboard.push(vec![
+            create_button(player.id, player.name.as_str(), CallbackAction::NoAction),
+            create_button(player.id, "Delete", CallbackAction::DeletePlayer),
+        ]);
+    }
+    keyboard.push(vec![create_button(
+        0,
+        "Back",
+        CallbackAction::HidePlayersKb,
+    )]);
+
+    InlineKeyboardMarkup::new(keyboard)
+}
+
+pub fn make_players_keyboard() -> InlineKeyboardMarkup {
+    let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+
+    keyboard.push(vec![
+        create_button(0, "Manage harm", CallbackAction::ShowHarmKb),
+        create_button(0, "Manage stress", CallbackAction::ShowStressKb),
+        create_button(0, "Manage players", CallbackAction::ShowPlayersKb),
+    ]);
+
+    InlineKeyboardMarkup::new(keyboard)
+}
+
+pub fn make_timers_keyboard() -> InlineKeyboardMarkup {
+    let mut keyboard: Vec<Vec<InlineKeyboardButton>> = Vec::new();
+
+    keyboard.push(vec![create_button(
+        0,
+        "Manage",
+        CallbackAction::ShowTimersKb,
+    )]);
+
+    InlineKeyboardMarkup::new(keyboard)
+}
+
+fn create_button(item_id: usize, name: &str, action: CallbackAction) -> InlineKeyboardButton {
+    InlineKeyboardButton::callback(name, Callback { item_id, action }.serialize())
 }

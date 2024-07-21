@@ -3,7 +3,7 @@ use std::env;
 use anyhow::{anyhow, bail};
 use lambda_http::{Body, Error, Request, Response};
 use teloxide::{
-    adaptors::{CacheMe, DefaultParseMode},
+    adaptors::{throttle::Limits, CacheMe, DefaultParseMode, Throttle},
     prelude::*,
     requests::RequesterExt,
     utils::command::BotCommands,
@@ -16,11 +16,11 @@ static SECRET_TOKEN_HEADER: &str = "x-telegram-bot-api-secret-token";
 static SECRET_TOKEN_ENV_VAR: &str = "AUTH_TOKEN";
 static DEBUG_CHAT_ID_ENV_VAR: &str = "DEBUG_CHAT_ID";
 
-pub type Bot = CacheMe<teloxide::Bot>;
-pub type MarkdownBot = DefaultParseMode<CacheMe<teloxide::Bot>>;
+pub type Bot = CacheMe<Throttle<teloxide::Bot>>;
+pub type MarkdownBot = DefaultParseMode<CacheMe<Throttle<teloxide::Bot>>>;
 
 pub async fn init_bot() -> Bot {
-    let bot = teloxide::Bot::from_env().cache_me();
+    let bot = teloxide::Bot::from_env().throttle(Limits::default()).cache_me();
 
     bot.set_my_commands(Command::bot_commands())
         .await

@@ -1,85 +1,87 @@
-use std::sync::Arc;
+use std::env;
 
+use anyhow::Context;
+use aws_config::{meta::region::RegionProviderChain, BehaviorVersion};
+use aws_sdk_s3::{operation::get_object::GetObjectError, primitives::ByteStream, Client};
 use teloxide::types::ChatId;
-use tokio::sync::Mutex;
+use tracing::{info, instrument, warn};
 
-use crate::tracker::{Item, Tracker};
+use crate::tracker::Tracker;
 
-#[derive(Clone)]
+const S3_BUCKET_ENV_VAR: &str = "S3_BUCKET";
+
 pub struct BotContext {
-    timers: Arc<Mutex<Tracker>>,
-    harm: Arc<Mutex<Tracker>>,
-    stress: Arc<Mutex<Tracker>>,
+    client: Client,
+    s3_path: String,
 }
 
 impl BotContext {
     pub async fn new(chat_id: ChatId) -> Self {
-        BotContext {
-            timers: Arc::new(Mutex::new(Tracker::new("timers", chat_id).await)),
-            harm: Arc::new(Mutex::new(Tracker::new("harm", chat_id).await)),
-            stress: Arc::new(Mutex::new(Tracker::new("stress", chat_id).await)),
+        let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
+        let config = aws_config::defaults(BehaviorVersion::latest())
+            .region(region_provider)
+            .load()
+            .await;
+
+        let dir = if chat_id.0 < 0 {
+            format!("_{}", -chat_id.0)
+        } else {
+            chat_id.to_string()
+        };
+
+        let s3_path = format!("{}/store.json", dir);
+        Self {
+            client: Client::new(&config),
+            s3_path,
         }
     }
 
-    pub async fn reset(&self) -> anyhow::Result<()> {
-        self.timers.lock().await.reset().await?;
-        self.harm.lock().await.reset().await?;
-        self.stress.lock().await.reset().await?;
+    pub async fn get(&self) -> anyhow::Result<Tracker> {
+        self.get_from_s3().await
+    }
+
+    #[instrument(skip(self), fields(s3_path = %self.s3_path))]
+    async fn get_from_s3(&self) -> anyhow::Result<Tracker> {
+        let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
+        info!("Fetching from S3 bucket {}", bucket);
+
+        let response = self
+            .client
+            .get_object()
+            .bucket(bucket)
+            .key(&self.s3_path)
+            .send()
+            .await;
+        match response {
+            Ok(response) => Ok(serde_json::from_slice(
+                &response.body.collect().await?.to_vec(),
+            )?),
+            Err(sdk_err) => {
+                warn!("Error fetching from S3: {:?}", sdk_err);
+                match sdk_err.into_service_error() {
+                    GetObjectError::NoSuchKey(_) => Ok(Tracker::new()),
+                    err => Err(err),
+                }
+            }
+        }
+        .with_context(|| "Error fetching from S3")
+    }
+
+    #[instrument(skip_all, fields(s3_path = %self.s3_path))]
+    pub async fn put(&self, tracker: &Tracker) -> anyhow::Result<()> {
+        let bucket = env::var(S3_BUCKET_ENV_VAR).unwrap();
+        info!("Writing to S3 bucket {}", bucket);
+
+        self.client
+            .put_object()
+            .bucket(bucket)
+            .key(&self.s3_path)
+            .body(ByteStream::from(
+                serde_json::to_string_pretty(tracker)?.as_bytes().to_owned(),
+            ))
+            .send()
+            .await
+            .with_context(|| "Error putting to S3")?;
         Ok(())
-    }
-
-    // Timers
-    pub async fn create_timer(&self, name: &str, start_value: u16) -> anyhow::Result<Item> {
-        self.timers.lock().await.add(name, start_value.into()).await
-    }
-
-    pub async fn list_timers(&self) -> anyhow::Result<Vec<Item>> {
-        self.timers.lock().await.list().await
-    }
-
-    // pub async fn get_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
-    // self.timers.lock().await.get(id).await
-    // }
-
-    pub async fn delete_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
-        self.timers.lock().await.delete(id).await
-    }
-
-    pub async fn tick_timer(&self, id: usize) -> anyhow::Result<Option<Item>> {
-        self.timers.lock().await.change(id, -1).await
-    }
-
-    // Harm
-    pub async fn create_harm(&self, name: &str) -> anyhow::Result<Item> {
-        self.harm.lock().await.add(name, 0).await
-    }
-
-    pub async fn list_harm(&self) -> anyhow::Result<Vec<Item>> {
-        self.harm.lock().await.list().await
-    }
-
-    pub async fn change_harm(&self, id: usize, change: i32) -> anyhow::Result<Option<Item>> {
-        self.harm.lock().await.change(id, change).await
-    }
-
-    pub async fn delete_harm(&self, id: usize) -> anyhow::Result<Option<Item>> {
-        self.harm.lock().await.delete(id).await
-    }
-
-    // Stress
-    pub async fn create_stress(&self, name: &str) -> anyhow::Result<Item> {
-        self.stress.lock().await.add(name, 0).await
-    }
-
-    pub async fn list_stress(&self) -> anyhow::Result<Vec<Item>> {
-        self.stress.lock().await.list().await
-    }
-
-    pub async fn change_stress(&self, id: usize, change: i32) -> anyhow::Result<Option<Item>> {
-        self.stress.lock().await.change(id, change).await
-    }
-
-    pub async fn delete_stress(&self, id: usize) -> anyhow::Result<Option<Item>> {
-        self.stress.lock().await.delete(id).await
     }
 }

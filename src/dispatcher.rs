@@ -31,14 +31,12 @@ pub enum Command {
     R3,
     #[command(description = "manage timers")]
     T,
-    #[command(description = "manage harm (damage)")]
-    D,
-    #[command(description = "manage stress")]
-    S,
-    #[command(description = "<name> - add player, creates harm and stress")]
-    Ap(String),
+    #[command(description = "manage players")]
+    P,
+    #[command(description = "<name> - add player")]
+    Pa(String),
     #[command(description = "<name> <start_value> - add timer")]
-    At(String, u16),
+    Ta(String, u16),
 }
 
 #[instrument(skip(bot))]
@@ -94,14 +92,21 @@ pub async fn dispatch_callback(handler: &BotHandler, cb: &CallbackQuery) -> anyh
     let callback = Callback::deserialize(data)?;
 
     match callback.action {
-        CallbackAction::TickTimer => handler.handle_tick_timer(callback.id).await,
-        CallbackAction::DeleteTimer => handler.handle_delete_timer(callback.id).await,
-        CallbackAction::AddHarm => handler.handle_change_harm(callback.id, 1).await,
-        CallbackAction::SubHarm => handler.handle_change_harm(callback.id, -1).await,
-        CallbackAction::DeleteHarm => handler.handle_delete_harm(callback.id).await,
-        CallbackAction::AddStress => handler.handle_change_stress(callback.id, 1).await,
-        CallbackAction::SubStress => handler.handle_change_stress(callback.id, -1).await,
-        CallbackAction::DeleteStress => handler.handle_delete_stress(callback.id).await,
+        CallbackAction::DeleteTimer => handler.handle_delete_timer(callback.item_id).await,
+        CallbackAction::AddHarm => handler.handle_change_harm(callback.item_id, 1).await,
+        CallbackAction::SubHarm => handler.handle_change_harm(callback.item_id, -1).await,
+        CallbackAction::AddStress => handler.handle_change_stress(callback.item_id, 1).await,
+        CallbackAction::SubStress => handler.handle_change_stress(callback.item_id, -1).await,
+        CallbackAction::NoAction => Ok(()),
+        CallbackAction::AddTimer => handler.handle_change_timer(callback.item_id, 1).await,
+        CallbackAction::SubTimer => handler.handle_change_timer(callback.item_id, -1).await,
+        CallbackAction::DeletePlayer => handler.handle_delete_player(callback.item_id).await,
+        CallbackAction::ShowTimersKb => handler.handle_show_timers_kb().await,
+        CallbackAction::ShowPlayersKb => handler.handle_show_players_kb().await,
+        CallbackAction::ShowHarmKb => handler.handle_show_harm_kb().await,
+        CallbackAction::ShowStressKb => handler.handle_show_stress_kb().await,
+        CallbackAction::HideTimersKb => handler.handle_hide_timers_kb().await,
+        CallbackAction::HidePlayersKb => handler.handle_hide_players_kb().await,
     }
 }
 
@@ -123,9 +128,8 @@ pub async fn dispatch_command(handler: &BotHandler, msg: &Message) -> anyhow::Re
         Command::R2 => handler.handle_roll(2).await,
         Command::R3 => handler.handle_roll(3).await,
         Command::T => handler.handle_list_timers().await,
-        Command::D => handler.handle_list_harm().await,
-        Command::S => handler.handle_list_stress().await,
-        Command::At(name, start_val) => handler.handle_create_timer(&name, start_val).await,
-        Command::Ap(name) => handler.handle_create_player(&name).await,
+        Command::P => handler.handle_list_players().await,
+        Command::Ta(name, start_val) => handler.handle_create_timer(&name, start_val).await,
+        Command::Pa(name) => handler.handle_create_player(&name).await,
     }
 }
